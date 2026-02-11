@@ -101,6 +101,82 @@ func TestClusterSecretUpdater(t *testing.T) {
 	}
 }
 
+func TestUpdateClusters_IgnoredClusterSkipped(t *testing.T) {
+	const fakeNamespace = "fake-ns"
+	now := time.Now()
+
+	emptyArgoCDConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      common.ArgoCDConfigMapName,
+			Namespace: fakeNamespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/part-of": "argocd",
+			},
+		},
+		Data: map[string]string{},
+	}
+	argoCDSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      common.ArgoCDSecretName,
+			Namespace: fakeNamespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/part-of": "argocd",
+			},
+		},
+		Data: map[string][]byte{
+			"admin.password":   nil,
+			"server.secretkey": nil,
+		},
+	}
+	kubeclientset := fake.NewClientset(emptyArgoCDConfigMap, argoCDSecret)
+	appclientset := appsfake.NewSimpleClientset()
+	appInformer := appinformers.NewApplicationInformer(appclientset, "", time.Minute, cache.Indexers{})
+	settingsManager := settings.NewSettingsManager(t.Context(), kubeclientset, fakeNamespace)
+	argoDB := db.NewDB(fakeNamespace, settingsManager, kubeclientset)
+	ctx := t.Context()
+
+	appCache := appstate.NewCache(cacheutil.NewCache(cacheutil.NewInMemoryCache(time.Minute)), time.Minute)
+
+	activeCluster, err := argoDB.CreateCluster(ctx, &v1alpha1.Cluster{Server: "http://active"})
+	require.NoError(t, err)
+
+	_, err = argoDB.CreateCluster(ctx, &v1alpha1.Cluster{
+		Server:      "http://ignored",
+		Annotations: map[string]string{common.AnnotationKeyClusterIgnore: "true"},
+	})
+	require.NoError(t, err)
+
+	info := &clustercache.ClusterInfo{
+		Server:            activeCluster.Server,
+		K8SVersion:        "1.0",
+		LastCacheSyncTime: &now,
+	}
+
+	lister := applisters.NewApplicationLister(appInformer.GetIndexer()).Applications(fakeNamespace)
+	updater := NewClusterInfoUpdater(
+		&fakeInfoSource{infos: []clustercache.ClusterInfo{*info}},
+		argoDB, lister, appCache, nil, nil, fakeNamespace,
+	)
+
+	updater.updateClusters()
+
+	var clusterInfo v1alpha1.ClusterInfo
+	err = appCache.GetClusterInfo(activeCluster.Server, &clusterInfo)
+	require.NoError(t, err)
+	assert.Equal(t, "1.0", clusterInfo.ServerVersion)
+
+	err = appCache.GetClusterInfo("http://ignored", &clusterInfo)
+	assert.Error(t, err, "ignored cluster should not have been updated in cache")
+}
+
+type fakeInfoSource struct {
+	infos []clustercache.ClusterInfo
+}
+
+func (f *fakeInfoSource) GetClustersInfo() []clustercache.ClusterInfo {
+	return f.infos
+}
+
 func TestUpdateClusterLabels(t *testing.T) {
 	shouldNotBeInvoked := func(_ context.Context, _ *v1alpha1.Cluster) (*v1alpha1.Cluster, error) {
 		shouldNotHappen := errors.New("if an error happens here, something's wrong")

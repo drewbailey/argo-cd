@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(argocd app:*)",
+      "Bash(golangci-lint run:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

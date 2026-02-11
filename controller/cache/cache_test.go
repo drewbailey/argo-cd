@@ -163,6 +163,48 @@ func TestHandleAddEvent_ClusterExcluded(t *testing.T) {
 	assert.Empty(t, clustersCache.clusters)
 }
 
+func TestHandleAddEvent_ClusterIgnored(t *testing.T) {
+	db := &dbmocks.ArgoDB{}
+	db.EXPECT().GetApplicationControllerReplicas().Return(1).Maybe()
+	clustersCache := liveStateCache{
+		clusters:        map[string]cache.ClusterCache{},
+		clusterSharding: sharding.NewClusterSharding(db, 0, 1, common.DefaultShardingAlgorithm),
+	}
+	clustersCache.handleAddEvent(&appv1.Cluster{
+		Server: "https://mycluster",
+		Annotations: map[string]string{
+			common.AnnotationKeyClusterIgnore: "true",
+		},
+	})
+
+	assert.Empty(t, clustersCache.clusters)
+}
+
+func TestHandleModEvent_ClusterIgnored(t *testing.T) {
+	clusterCache := &mocks.ClusterCache{}
+	clusterCache.EXPECT().Invalidate(mock.Anything, mock.Anything).Return().Once()
+	db := &dbmocks.ArgoDB{}
+	db.EXPECT().GetApplicationControllerReplicas().Return(1).Maybe()
+	clustersCache := liveStateCache{
+		clusters: map[string]cache.ClusterCache{
+			"https://mycluster": clusterCache,
+		},
+		clusterSharding: sharding.NewClusterSharding(db, 0, 1, common.DefaultShardingAlgorithm),
+		lock:            sync.RWMutex{},
+	}
+
+	clustersCache.handleModEvent(&appv1.Cluster{
+		Server: "https://mycluster",
+	}, &appv1.Cluster{
+		Server: "https://mycluster",
+		Annotations: map[string]string{
+			common.AnnotationKeyClusterIgnore: "true",
+		},
+	})
+
+	assert.Empty(t, clustersCache.clusters)
+}
+
 func TestHandleDeleteEvent_CacheDeadlock(t *testing.T) {
 	testCluster := &appv1.Cluster{
 		Server: "https://mycluster",
