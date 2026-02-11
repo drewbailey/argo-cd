@@ -906,8 +906,15 @@ func (ctrl *ApplicationController) Run(ctx context.Context, statusProcessors int
 	if err != nil {
 		log.WithError(err).Warn("Cannot init sharding. Error while querying clusters list from database")
 	} else {
-		appItems, err := ctrl.getAppList(metav1.ListOptions{})
+		filtered := make([]appv1.Cluster, 0, len(clusters.Items))
+		for i := range clusters.Items {
+			if clusters.Items[i].Annotations[common.AnnotationKeyClusterIgnore] != "true" {
+				filtered = append(filtered, clusters.Items[i])
+			}
+		}
+		clusters.Items = filtered
 
+		appItems, err := ctrl.getAppList(metav1.ListOptions{})
 		if err != nil {
 			log.WithError(err).Warn("Cannot init sharding. Error while querying application list from database")
 		} else {

@@ -91,14 +91,14 @@ func (c *clusterInfoUpdater) updateClusters() {
 		return
 	}
 	var clustersFiltered []appv1.Cluster
-	if c.clusterFilter == nil {
-		clustersFiltered = clusters.Items
-	} else {
-		for i := range clusters.Items {
-			if c.clusterFilter(&clusters.Items[i]) {
-				clustersFiltered = append(clustersFiltered, clusters.Items[i])
-			}
+	for i := range clusters.Items {
+		if clusters.Items[i].Annotations[common.AnnotationKeyClusterIgnore] == "true" {
+			continue
 		}
+		if c.clusterFilter != nil && !c.clusterFilter(&clusters.Items[i]) {
+			continue
+		}
+		clustersFiltered = append(clustersFiltered, clusters.Items[i])
 	}
 	_ = kube.RunAllAsync(len(clustersFiltered), func(i int) error {
 		cluster := clustersFiltered[i]

@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/argoproj/argo-cd/v3/common"
 	"github.com/argoproj/argo-cd/v3/controller/metrics"
 	"github.com/argoproj/argo-cd/v3/controller/sharding"
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application"
@@ -817,11 +818,19 @@ func (c *liveStateCache) Run(ctx context.Context) error {
 	return nil
 }
 
+func isClusterIgnored(cluster *appv1.Cluster) bool {
+	return cluster.Annotations[common.AnnotationKeyClusterIgnore] == "true"
+}
+
 func (c *liveStateCache) canHandleCluster(cluster *appv1.Cluster) bool {
 	return c.clusterSharding.IsManagedCluster(cluster)
 }
 
 func (c *liveStateCache) handleAddEvent(cluster *appv1.Cluster) {
+	if isClusterIgnored(cluster) {
+		log.Infof("Ignoring cluster %s: annotated with %s", cluster.Server, common.AnnotationKeyClusterIgnore)
+		return
+	}
 	c.clusterSharding.Add(cluster)
 	if !c.canHandleCluster(cluster) {
 		log.Infof("Ignoring cluster %s", cluster.Server)
@@ -846,6 +855,19 @@ func (c *liveStateCache) handleAddEvent(cluster *appv1.Cluster) {
 }
 
 func (c *liveStateCache) handleModEvent(oldCluster *appv1.Cluster, newCluster *appv1.Cluster) {
+	if isClusterIgnored(newCluster) {
+		log.Infof("Cluster %s now has %s annotation, removing from cache", newCluster.Server, common.AnnotationKeyClusterIgnore)
+		c.lock.Lock()
+		cluster, ok := c.clusters[newCluster.Server]
+		c.lock.Unlock()
+		if ok {
+			cluster.Invalidate()
+			c.lock.Lock()
+			delete(c.clusters, newCluster.Server)
+			c.lock.Unlock()
+		}
+		return
+	}
 	c.clusterSharding.Update(oldCluster, newCluster)
 	c.lock.Lock()
 	cluster, ok := c.clusters[newCluster.Server]

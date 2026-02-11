@@ -204,6 +204,10 @@ const (
 	// AnnotationCompareOptions is a comma-separated list of options for comparison
 	AnnotationCompareOptions = "argocd.argoproj.io/compare-options"
 
+	// AnnotationKeyClusterIgnore when set to "true" on a cluster secret causes the
+	// controller to skip reconciliation and cache warming for that cluster.
+	AnnotationKeyClusterIgnore = "argocd.argoproj.io/cluster-ignore"
+
 	// AnnotationClientSideApplyMigrationManager specifies a custom field manager for client-side apply migration
 	AnnotationClientSideApplyMigrationManager = "argocd.argoproj.io/client-side-apply-migration-manager"
 
