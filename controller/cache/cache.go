@@ -828,7 +828,7 @@ func (c *liveStateCache) canHandleCluster(cluster *appv1.Cluster) bool {
 
 func (c *liveStateCache) handleAddEvent(cluster *appv1.Cluster) {
 	if isClusterIgnored(cluster) {
-		log.Infof("Ignoring cluster %s: annotated with %s", cluster.Server, common.AnnotationKeyClusterIgnore)
+		log.Debugf("Ignoring cluster %s: annotated with %s", cluster.Server, common.AnnotationKeyClusterIgnore)
 		return
 	}
 	c.clusterSharding.Add(cluster)

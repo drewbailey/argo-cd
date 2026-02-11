@@ -222,21 +222,21 @@ func TestClusterIgnoreAnnotation(t *testing.T) {
 
 	clusterURL := url.QueryEscape(KubernetesInternalAPIServerAddr)
 
-	// Set the cluster-ignore annotation
+	// Set the application-cluster-ignore annotation
 	var cluster Cluster
 	err := fixture.DoHttpJsonRequest("PUT",
 		fmt.Sprintf("/api/v1/clusters/%s?updatedFields=annotations", clusterURL),
 		&cluster,
-		[]byte(fmt.Sprintf(`{"annotations":{"%s":"true"}}`, "argocd.argoproj.io/cluster-ignore"))...)
+		[]byte(fmt.Sprintf(`{"annotations":{"%s":"true"}}`, "argocd.argoproj.io/application-cluster-ignore"))...)
 	require.NoError(t, err)
-	assert.Equal(t, "true", cluster.Annotations["argocd.argoproj.io/cluster-ignore"])
+	assert.Equal(t, "true", cluster.Annotations["argocd.argoproj.io/application-cluster-ignore"])
 
 	// Cluster should still be visible in the API
 	var cluster2 Cluster
 	err = fixture.DoHttpJsonRequest("GET", "/api/v1/clusters/"+clusterURL, &cluster2)
 	require.NoError(t, err)
 	assert.Equal(t, "in-cluster", cluster2.Name)
-	assert.Equal(t, "true", cluster2.Annotations["argocd.argoproj.io/cluster-ignore"])
+	assert.Equal(t, "true", cluster2.Annotations["argocd.argoproj.io/application-cluster-ignore"])
 
 	// Clean up: remove the annotation
 	err = fixture.DoHttpJsonRequest("PUT",

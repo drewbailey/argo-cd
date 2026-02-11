@@ -595,6 +595,53 @@ stringData:
     }
 ```
 
+### Ignoring Clusters
+
+You can prevent the application controller from reconciling a cluster by annotating its secret with
+`argocd.argoproj.io/application-cluster-ignore: "true"`. The controller will skip all cache warming, sharding, and
+cluster info updates for that cluster while it remains visible in API responses (`argocd cluster list`, etc.).
+
+This is useful for temporarily disabling a cluster during maintenance or migration without removing it from Argo CD.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mycluster-secret
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+  annotations:
+    argocd.argoproj.io/application-cluster-ignore: "true"
+type: Opaque
+stringData:
+  name: mycluster.example.com
+  server: https://mycluster.example.com
+  config: |
+    {
+      "bearerToken": "<authentication token>",
+      "tlsClientConfig": {
+        "insecure": false,
+        "caData": "<base64 encoded certificate>"
+      }
+    }
+```
+
+To ignore an existing cluster:
+
+```bash
+kubectl -n argocd annotate secret mycluster-secret argocd.argoproj.io/application-cluster-ignore=true
+```
+
+To resume reconciliation, remove the annotation:
+
+```bash
+kubectl -n argocd annotate secret mycluster-secret argocd.argoproj.io/application-cluster-ignore-
+```
+
+> [!NOTE]
+> This is analogous to `argocd.argoproj.io/skip-reconcile` on Applications (see [Skip Application Reconcile](../user-guide/skip_reconcile.md)),
+> but operates at the cluster level. Applications targeting an ignored cluster will not be reconciled until the annotation is removed.
+
 ### EKS
 
 EKS cluster secret example using argocd-k8s-auth and [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) and [Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html):
