@@ -227,7 +227,7 @@ func TestClusterIgnoreAnnotation(t *testing.T) {
 	err := fixture.DoHttpJsonRequest("PUT",
 		fmt.Sprintf("/api/v1/clusters/%s?updatedFields=annotations", clusterURL),
 		&cluster,
-		[]byte(fmt.Sprintf(`{"annotations":{"%s":"true"}}`, "argocd.argoproj.io/application-cluster-ignore"))...)
+		fmt.Appendf(nil, `{"annotations":{%q:"true"}}`, "argocd.argoproj.io/application-cluster-ignore")...)
 	require.NoError(t, err)
 	assert.Equal(t, "true", cluster.Annotations["argocd.argoproj.io/application-cluster-ignore"])
 
